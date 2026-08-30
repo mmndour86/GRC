@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-grc_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définissez POSTGRES_PASSWORD dans .env}
+      POSTGRES_DB: ${POSTGRES_DB:-grc_db}
+    volumes:
+      - grc_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-grc_user} -d ${POSTGRES_DB:-grc_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-grc_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-grc_db}
+    ports:
+      - "${GRC_PORT:-8501}:8501"
+    volumes:
+      # Conserve db/ADMIN_INITIAL_PASSWORD.txt même si la base est PostgreSQL ;
+      # inutile pour les données elles-mêmes (stockées dans le volume postgres).
+      - grc_app_db:/app/db
+
+volumes:
+  grc_postgres_data:
+  grc_app_db:
